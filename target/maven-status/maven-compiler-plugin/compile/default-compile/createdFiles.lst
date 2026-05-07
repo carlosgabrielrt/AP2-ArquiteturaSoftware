@@ -1,0 +1,9 @@
+Main.class
+service/ProductService.class
+domain/EntityInterface.class
+utils/GenerateValue.class
+service/ServiceInterface.class
+adapter/PersistInterface.class
+domain/Price.class
+adapter/DatabaseStorage.class
+domain/Product.class
