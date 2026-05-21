@@ -4,45 +4,63 @@ import jakarta.persistence.*;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
-import java.math.BigDecimal;
 import java.util.Date;
 import java.util.UUID;
 
 @Entity
-@Table(name = "product")
-
+@Table(name = "price")
 public class Price implements EntityInterface {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     @JdbcTypeCode(SqlTypes.VARCHAR)
-    @Column(name = "uuui", length = 36)
+    @Column(name = "uuid", length = 36)
     private UUID uuid;
 
     @Column(name = "price")
     private Float price;
 
     @Temporal(TemporalType.TIMESTAMP)
-    @Column(name = "date_price")
+    @Column(name = "date")
     private Date date;
 
+    @Column(name = "store")
+    private String store;
+
     @ManyToOne
-    @JoinColumn(name = "produto_id")
-   private Product product;
+    @JoinColumn(name = "product_id")
+    private Product product;
+
+    public Product getProduct() {
+        return product;
+    }
+
+    public void setProduct(Product product) {
+        this.product = product;
+    }
 
     public Price() {
     }
 
- public Price(Float price, Date date) {
-
+    public Price(Float price, Date date, String store) {
         this.price = price;
         this.date = date;
+        this.store = store;
     }
 
-    public Price(UUID uuid, Float price, Date date) {
+    public Price(UUID uuid, Float price, Date date, String store) {
         this.uuid = uuid;
         this.price = price;
         this.date = date;
+        this.store = store;
+    }
+
+    public String getStore() {
+        return store;
+    }
+
+    public void setStore(String store) {
+        this.store = store;
     }
 
     @Override
@@ -55,6 +73,7 @@ public class Price implements EntityInterface {
         return "Price{" +
                 "price=" + price +
                 ", date=" + date +
+                ", store='" + store + '\'' +
                 '}';
     }
 }

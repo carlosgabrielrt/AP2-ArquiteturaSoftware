@@ -27,21 +27,26 @@ public class Product implements EntityInterface {
     @Column(name = "price")
     private Float price;
 
-
     @Temporal(TemporalType.TIMESTAMP)
-
     @Column(name = "date_price")
     private Date datePrice;
 
+    @Column(name = "store")
+    private String store;
+
     @OneToMany(
             mappedBy = "product",
-            cascade =CascadeType.ALL,
+            cascade = CascadeType.ALL,
             orphanRemoval = true,
-            fetch = FetchType.EAGER
-
-    )
-    @Transient
+            fetch = FetchType.LAZY)
     private List<Price> historicalPrice = new ArrayList<>();
+
+    @OneToMany(
+            mappedBy = "product",
+            cascade = CascadeType.ALL,
+            orphanRemoval = true,
+            fetch = FetchType.LAZY)
+    private List<ProductLink> links = new ArrayList<>();
 
     public Product() {
     }
@@ -81,12 +86,46 @@ public class Product implements EntityInterface {
 
     public void setPrice(Float price) {
         if (this.price != null && this.datePrice != null) {
-            Price oldPrice = new Price(this.price, this.datePrice);
+            Price oldPrice = new Price(this.price, this.datePrice, this.store);
+            oldPrice.setProduct(this);
             historicalPrice.add(oldPrice);
         }
 
         this.price = price;
         this.datePrice = new Date();
+    }
+
+    public void updateBestPrice(Float price, String store) {
+        if (this.price != null && this.datePrice != null) {
+            Price oldPrice = new Price(this.price, this.datePrice, this.store);
+            oldPrice.setProduct(this);
+            historicalPrice.add(oldPrice);
+        }
+
+        this.price = price;
+        this.store = store;
+        this.datePrice = new Date();
+    }
+
+    public String getStore() {
+        return store;
+    }
+
+    public void setStore(String store) {
+        this.store = store;
+    }
+
+    public List<ProductLink> getLinks() {
+        return links;
+    }
+
+    public void setLinks(List<ProductLink> links) {
+        this.links = links;
+    }
+
+    public void addLink(ProductLink link) {
+        links.add(link);
+        link.setProduct(this);
     }
 
     public Date getDatePrice() {
@@ -101,7 +140,7 @@ public class Product implements EntityInterface {
         return historicalPrice;
     }
 
-    public void setHistoricalPrice(ArrayList<Price> historicalPrice) {
+    public void setHistoricalPrice(List<Price> historicalPrice) {
         this.historicalPrice = historicalPrice;
     }
 
@@ -114,10 +153,12 @@ public class Product implements EntityInterface {
     public String toString() {
         return "Product{" +
                 "UUID='" + uuid.toString() +'\'' +
-                "Sku='" + sku + '\'' +
+                ", Sku='" + sku + '\'' +
                 ", name='" + name + '\'' +
                 ", price=" + price +
+                ", store='" + store + '\'' +
                 ", datePrice=" + datePrice +
+                ", links=" + links +
                 ", historicalPrice=" + historicalPrice +
                 '}';
     }
