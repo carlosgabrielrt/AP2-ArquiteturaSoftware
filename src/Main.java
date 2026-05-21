@@ -22,15 +22,12 @@ public class Main {
             System.out.println("Produto PlayStation 5 de teste criado.");
         }
 
-        if (!hasPs5) {
-            Product ps5 = new Product("PS5-01", "PlayStation5", null);
-            productStorage.save(ps5);
-            System.out.println("Produto PlayStation 5 de teste criado.");
-        }
+
 
 
 
         CrawlerService crawler = new CrawlerService();
         crawler.runCrawler();
+        crawler.printProductsJson();
     }
 }

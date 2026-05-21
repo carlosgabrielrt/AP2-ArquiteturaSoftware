@@ -1,0 +1,13 @@
+[ {
+  "nome" : "PlayStation 5",
+  "preco" : 17.0,
+  "Loja mais barata" : "Kabum",
+  "loja" : "",
+  "links" : [ {
+    "loja" : "Kabum",
+    "url" : "https://www.kabum.com.br/busca/playstation-5"
+  }, {
+    "loja" : "Mercado Livre",
+    "url" : "https://lista.mercadolivre.com.br/playstation-5"
+  } ]
+} ]

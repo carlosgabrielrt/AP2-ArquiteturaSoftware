@@ -1,6 +1,7 @@
 package service;
 
 import adapter.DatabaseStorage;
+import domain.EntityInterface;
 import domain.Product;
 import domain.ProductLink;
 import org.jsoup.Jsoup;
@@ -13,6 +14,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Objects;
 
 public class CrawlerService {
 
@@ -51,7 +53,7 @@ public class CrawlerService {
 
                 if (currentPrice != null) {
                     System.out.println("    Preço encontrado: R$ " + currentPrice);
-                    if (lowestPrice == null || currentPrice < lowestPrice) {
+                    if (lowestPrice == null || Float.compare(currentPrice, lowestPrice) < 0) {
                         lowestPrice = currentPrice;
                         lowestPriceStore = storeName;
                     }
@@ -61,12 +63,15 @@ public class CrawlerService {
             }
 
             if (lowestPrice != null) {
-                // Atualiza o produto se for diferente
                 boolean shouldUpdate = false;
                 if (product.getPrice() == null) {
                     shouldUpdate = true;
-                } else if (!product.getPrice().equals(lowestPrice) || !lowestPriceStore.equals(product.getStore())) {
-                    shouldUpdate = true;
+                } else {
+                    boolean priceDiff = !Objects.equals(product.getPrice(), lowestPrice);
+                    boolean storeDiff = !Objects.equals(product.getStore(), lowestPriceStore);
+                    if (priceDiff || storeDiff) {
+                        shouldUpdate = true;
+                    }
                 }
 
                 if (shouldUpdate) {
@@ -94,7 +99,6 @@ public class CrawlerService {
 
     private Float fetchPrice(String storeName, String url) {
         try {
-            // Adiciona user agent para evitar alguns bloqueios simples
             Document doc = Jsoup.connect(url)
                     .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
                     .timeout(10000)
@@ -109,7 +113,6 @@ public class CrawlerService {
             } else {
                 System.out.println("    [Aviso] Loja não suportada pelo parser: " + storeName);
             }
-
         } catch (IOException e) {
             System.out.println("    [Erro] Falha ao acessar a URL: " + e.getMessage());
         } catch (Exception e) {
@@ -119,23 +122,37 @@ public class CrawlerService {
     }
 
     private Float parseKabum(Document doc) {
-        // Exemplo de seletor para Kabum busca:
+        // Try primary selector
         Element priceElement = doc.selectFirst(".priceCard");
+        // Fallback selectors if primary not found
         if (priceElement == null) {
             priceElement = doc.selectFirst("span[class*=priceCard]");
+        }
+        if (priceElement == null) {
+            // Additional fallback for possible new layout
+            priceElement = doc.selectFirst(".price");
+        }
+        if (priceElement == null) {
+            // Generic fallback: look for any element that contains a price pattern like "R$"
+            priceElement = doc.getElementsContainingOwnText("R$").first();
         }
         if (priceElement != null) {
             String text = priceElement.text();
             return parseMoneyText(text);
         }
+        System.out.println("    [Aviso] Preço não encontrado na página Kabum");
         return null;
     }
 
     private Float parseMercadoLivre(Document doc) {
-        // Exemplo de seletor Mercado Livre na busca
-        Element priceElement = doc.selectFirst(".ui-search-price__second-line .andes-money-amount__fraction");
+        Element priceElement = doc.selectFirst(".andes-money-amount__fraction");
         if (priceElement == null) {
-            priceElement = doc.selectFirst(".andes-money-amount__fraction");
+            // Fallback selectors for possible layout changes
+            priceElement = doc.selectFirst(".price-tag-fraction");
+        }
+        if (priceElement == null) {
+            // Generic fallback: any element containing a price pattern like "R$"
+            priceElement = doc.getElementsContainingOwnText("R$").first();
         }
         if (priceElement != null) {
             String text = priceElement.text();
@@ -146,13 +163,8 @@ public class CrawlerService {
 
     private Float parseMoneyText(String text) {
         if (text == null || text.trim().isEmpty()) return null;
-
-        // Remove "R$" e espaços
         String cleanText = text.replaceAll("[R$\\s\\u00A0]", "");
-
-        // Formato brasileiro: 1.500,00 -> 1500.00
         cleanText = cleanText.replace(".", "").replace(",", ".");
-
         try {
             return Float.parseFloat(cleanText);
         } catch (NumberFormatException e) {
@@ -163,35 +175,35 @@ public class CrawlerService {
     public void printProductsJson() {
         try {
             ObjectMapper mapper = new ObjectMapper();
-            ArrayList<domain.EntityInterface> entities = productStorage.listAll();
-
+            ArrayList<EntityInterface> entities = productStorage.listAll();
+            ArrayNode productsArray = mapper.createArrayNode();
             for (domain.EntityInterface entity : entities) {
-                Product product = (Product) entity;
+            Product product = (Product) entity;
+            ObjectNode productNode = mapper.createObjectNode();
+            productNode.put("nome", product.getName());
+            productNode.put("preco", product.getPrice() != null ? product.getPrice() : null);
+            productNode.put("Loja mais barata", product.getStore() != null ? product.getStore() : "");
+            productNode.put("loja", "");
 
-                ObjectNode productNode = mapper.createObjectNode();
-                productNode.put("nome", product.getName());
-
-                String nameForUrlKabum = product.getName().toLowerCase().replace(" ", "-");
-                String kabumUrl = "https://www.kabum.com.br/busca/" + nameForUrlKabum;
-
-                String nameForUrlMl = product.getName().toLowerCase().replace(" ", "-");
-                String mlUrl = "https://lista.mercadolivre.com.br/" + nameForUrlMl;
-
-                ArrayNode linksArray = productNode.putArray("links");
-
-                ObjectNode kabumNode = mapper.createObjectNode();
-                kabumNode.put("loja", "Kabum");
-                kabumNode.put("url", kabumUrl);
-                linksArray.add(kabumNode);
-
-                ObjectNode mlNode = mapper.createObjectNode();
-                mlNode.put("loja", "Mercado Livre");
-                mlNode.put("url", mlUrl);
-                linksArray.add(mlNode);
-
-                String json = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(productNode);
-                System.out.println(json);
-            }
+            String nameForUrlKabum = product.getName().toLowerCase().replace(" ", "-");
+            String kabumUrl = "https://www.kabum.com.br/busca/" + nameForUrlKabum;
+            String nameForUrlMl = product.getName().toLowerCase().replace(" ", "-");
+            String mlUrl = "https://lista.mercadolivre.com.br/" + nameForUrlMl;
+            ArrayNode linksArray = productNode.putArray("links");
+            ObjectNode kabumNode = mapper.createObjectNode();
+            kabumNode.put("loja", "Kabum");
+            kabumNode.put("url", kabumUrl);
+            linksArray.add(kabumNode);
+            ObjectNode mlNode = mapper.createObjectNode();
+            mlNode.put("loja", "Mercado Livre");
+            mlNode.put("url", mlUrl);
+            linksArray.add(mlNode);
+            productsArray.add(productNode);
+            String json = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(productNode);
+            System.out.println(json);
+        }
+            mapper.writerWithDefaultPrettyPrinter().writeValue(new java.io.File("products.json"), productsArray);
+            System.out.println("JSON salvo em: " + new java.io.File("products.json").getAbsolutePath());
         } catch (Exception e) {
             System.out.println("Erro ao gerar JSON: " + e.getMessage());
         }
